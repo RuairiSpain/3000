@@ -1,0 +1,27 @@
+
+
+docker run -it -d --name db --expose 3306 --volume /app --env MYSQL_ROOT_PASSWORD=pw  --env MYSQL_DATABASE=support alpine /bin/ash
+//Install MySQL and clean up application cache
+docker exec db apk add --update mysql mysql-client
+docker exec db rm -f /var/cache/apk/*
+//Copy config from host to Container
+docker cp my.cnf db:/etc/mysql/my.cnf
+//Copy startup script from host to Container
+docker cp startup.sh db:/startup.sh
+//Run startup
+docker exec db /startup.sh
+//Another Window
+docker exec -it db mysql -uroot
+ show databases;
+ use test;
+ show tables;
+ CREATE TABLE Persons
+  (
+  PersonID int,
+  LastName varchar(255),
+  FirstName varchar(255),
+  City varchar(255)
+  );
+  INSERT INTO Customers (id, LastName, FirstName, City)
+ VALUES (1, 'Bob','Smurfit','Washington');
+ SELECT * FROM Customers;
