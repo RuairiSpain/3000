@@ -170,27 +170,29 @@ Part 2
 Add Private Registry
 
 In VirtualBox, open the Ubuntu client, we use a VM instead of a real server for training purposes.  In a production/developer environment we would have a standalone server with "registry" configured.
+Steps already done. It takes 30 minutes on a 1Gb network, to ave time these steps are already done.  Review the steps so you are familar with the installation process.  We'll jump to the configuration of the Docker private registry.
+    $ cd ~/Downloads
+    $ sudo ./install-compose.sh
+        Ingnore any warnings about older versions
 
-$ cd ~/Downloads
-$ sudo ./install-compose.sh
-    Ingnore any warnings about older versions
+    Allpw non-root users to run docker?
+    $ sudo usermod -aG docker user
 
-Allpw non-root users to run docker?
-$ sudo usermod -aG docker user
+    Change directory to the Portus folder
+    $ cd ~/Downloads/Portus
 
-Change directory to the Portus folder
-$ cd ~/Downloads/Portus
+    Find your IP address of the ubuntu VM, It is after Id Addr in the "Ehternet" details
+    $ ifconfig
+
+    Start the build script to install and configure Portus
+    $ ./compose-setup.sh -e  ___.___.___.___
+
+    Are you sure to delete all the data? (Y), type Y and enter
+
+    This will take 15-20 minutes to install, take a break!
 
 Find your IP address of the ubuntu VM, It is after Id Addr in the "Ehternet" details
 $ ifconfig
-
-
-Start the build script to install and configure Portus
-$ ./compose-setup.sh -e  ___.___.___.___
-
-Are you sure to delete all the data? (Y), type Y and enter
-
-This will take 15-20 minutes to install, take a break!
 
 Once the portus server is running.
 In a new Terminal window

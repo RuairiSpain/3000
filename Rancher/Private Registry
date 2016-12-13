@@ -1,0 +1,110 @@
+PS C:\Users\ruair> docker-machine active
+ubuntu
+PS C:\Users\ruair> docker env default
+docker: 'env' is not a docker command.
+See 'docker --help'.
+PS C:\Users\ruair> docker-machine env default
+$Env:DOCKER_TLS_VERIFY = "1"
+$Env:DOCKER_HOST = "tcp://192.168.99.106:2376"
+$Env:DOCKER_CERT_PATH = "C:\Users\ruair\.docker\machine\machines\default"
+$Env:DOCKER_MACHINE_NAME = "default"
+# Run this command to configure your shell:
+# & "C:\Program Files\Docker\Docker\Resources\bin\docker-machine.exe" env default | Invoke-Expression
+PS C:\Users\ruair> & "C:\Program Files\Docker\Docker\Resources\bin\docker-machine.exe" env default | Invoke-Expression
+PS C:\Users\ruair> docker-machine active
+default
+PS C:\Users\ruair> docker-machine create --driver virtualbox --engine-insecure-registry reg.local:5000 mycompany
+Running pre-create checks...
+Creating machine...
+(mycompany) Copying C:\Users\ruair\.docker\machine\cache\boot2docker.iso to C:\Users\ruair\.docker\machine\machines\mycompany\boot2docker.iso...
+(mycompany) Creating VirtualBox VM...
+(mycompany) Creating SSH key...
+(mycompany) Starting the VM...
+(mycompany) Check network to re-create if needed...
+(mycompany) Waiting for an IP...
+Waiting for machine to be running, this may take a few minutes...
+Detecting operating system of created instance...
+Waiting for SSH to be available...
+Detecting the provisioner...
+Provisioning with boot2docker...
+Copying certs to the local machine directory...
+Copying certs to the remote machine...
+Setting Docker configuration on the remote daemon...
+Checking connection to Docker...
+Docker is up and running!
+To see how to connect your Docker Client to the Docker Engine running on this virtual machine, run: C:\Program Files\Docker\Docker\Resources\bin\docker-machine.exe env mycompany
+PS C:\Users\ruair> docker env mycompany
+docker: 'env' is not a docker command.
+See 'docker --help'.
+PS C:\Users\ruair> docker-machine env mycompany
+$Env:DOCKER_TLS_VERIFY = "1"
+$Env:DOCKER_HOST = "tcp://192.168.99.107:2376"
+$Env:DOCKER_CERT_PATH = "C:\Users\ruair\.docker\machine\machines\mycompany"
+$Env:DOCKER_MACHINE_NAME = "mycompany"
+# Run this command to configure your shell:
+# & "C:\Program Files\Docker\Docker\Resources\bin\docker-machine.exe" env mycompany | Invoke-Expression
+PS C:\Users\ruair> & "C:\Program Files\Docker\Docker\Resources\bin\docker-machine.exe" env mycompany | Invoke-Expression
+PS C:\Users\ruair> docker pull alpine
+Using default tag: latest
+latest: Pulling from library/alpine
+
+3690ec4760f9: Pull complete
+Digest: sha256:1354db23ff5478120c980eca1611a51c9f2b88b61f24283ee8200bf9a54f2e5c
+Status: Downloaded newer image for alpine:latest
+PS C:\Users\ruair> docker tag alpine reg.local:5000/admin/alpine
+PS C:\Users\ruair> docker images
+REPOSITORY                    TAG                 IMAGE ID            CREATED             SIZE
+alpine                        latest              baa5d63471ea        8 weeks ago         4.803 MB
+reg.local:5000/admin/alpine   latest              baa5d63471ea        8 weeks ago         4.803 MB
+PS C:\Users\ruair> docker pull reg.local:5000/admin/alpine
+Using default tag: latest
+Pulling repository reg.local:5000/admin/alpine
+Error while pulling image: Get http://reg.local:5000/v1/repositories/admin/alpine/images: dial tcp: lookup reg.local on 10.0.2.3:53: no such host
+PS C:\Users\ruair> docker push reg.local:5000/admin/alpine
+The push refers to a repository [reg.local:5000/admin/alpine]
+Put http://reg.local:5000/v1/repositories/admin/alpine/: dial tcp: lookup reg.local on 10.0.2.3:53: no such host
+PS C:\Users\ruair> docker push reg.local:5000/admin/alpine
+The push refers to a repository [reg.local:5000/admin/alpine]
+011b303988d2: Pushed
+latest: digest: sha256:9036135632337832700f27c98bc5bd9b8b423d26a16d5ab25d36335ad3d89efa size: 1494
+PS C:\Users\ruair> docker images
+PS C:\Users\ruair> docker ps
+PS C:\Users\ruair> docker-machine env mycompany
+Error checking TLS connection: Host is not running
+PS C:\Users\ruair> docker ps
+PS C:\Users\ruair> docker-machine env mycompany
+$Env:DOCKER_TLS_VERIFY = "1"
+$Env:DOCKER_HOST = "tcp://192.168.99.107:2376"
+$Env:DOCKER_CERT_PATH = "C:\Users\ruair\.docker\machine\machines\mycompany"
+$Env:DOCKER_MACHINE_NAME = "mycompany"
+# Run this command to configure your shell:
+# & "C:\Program Files\Docker\Docker\Resources\bin\docker-machine.exe" env mycompany | Invoke-Expression
+PS C:\Users\ruair> docker-machine active
+mycompany
+PS C:\Users\ruair> docker ps
+CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
+PS C:\Users\ruair> docker images
+REPOSITORY                    TAG                 IMAGE ID            CREATED             SIZE
+alpine                        latest              baa5d63471ea        8 weeks ago         4.803 MB
+reg.local:5000/admin/alpine   latest              baa5d63471ea        8 weeks ago         4.803 MB
+PS C:\Users\ruair> docker rmi ba
+Error response from daemon: conflict: unable to delete baa5d63471ea (must be forced) - image is referenced in one or more repositories
+PS C:\Users\ruair> docker rmi ba -f
+Untagged: alpine:latest
+Untagged: alpine@sha256:1354db23ff5478120c980eca1611a51c9f2b88b61f24283ee8200bf9a54f2e5c
+Untagged: reg.local:5000/admin/alpine:latest
+Untagged: reg.local:5000/admin/alpine@sha256:9036135632337832700f27c98bc5bd9b8b423d26a16d5ab25d36335ad3d89efa
+Deleted: sha256:baa5d63471ead618ff91ddfacf1e2c81bf0612bfeb1daf00eb0843a41fbfade3
+Deleted: sha256:011b303988d241a4ae28a6b82b0d8262751ef02910f0ae2265cb637504b72e36
+PS C:\Users\ruair> docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+PS C:\Users\ruair> docker pull reg.local:5000/admin/alpine
+Using default tag: latest
+latest: Pulling from admin/alpine
+3690ec4760f9: Pull complete
+Digest: sha256:9036135632337832700f27c98bc5bd9b8b423d26a16d5ab25d36335ad3d89efa
+Status: Downloaded newer image for reg.local:5000/admin/alpine:latest
+PS C:\Users\ruair> docker images
+REPOSITORY                    TAG                 IMAGE ID            CREATED             SIZE
+reg.local:5000/admin/alpine   latest              baa5d63471ea        8 weeks ago         4.803 MB
+PS C:\Users\ruair>
