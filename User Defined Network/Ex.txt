@@ -1,0 +1,37 @@
+docker network create -d bridge cargo-backend  --subnet=172.19.1.0/24
+docker network create -d bridge cargo-frontend --subnet=172.19.0.0/24
+docker network ls
+
+docker create -v /data --hostname db --name db mongo
+
+docker network connect cargo-backend db
+
+docker network connect cargo-frontend db
+
+docker start -i db
+
+Different Powershell window
+
+docker run -itd --network=cargo-frontend --name=webapp node
+
+Test
+  docker exec -it webapp ping -c 3 db
+
+Whats the IP of the db Contianer?
+
+
+docker run -itd --network=cargo-backend --name=admin microsoft/aspnetcore
+
+Test
+  docker exec -it admin ping -c 3 db
+
+Whats the IP of the db Contianer?
+
+
+
+If it fails, start again by removing the containers
+  docker rm -f $(docker ps -a -q)
+
+If the network is worng
+  docker network rm cargo-backend
+  docker network rm cargo-frontend

@@ -1,0 +1,217 @@
+Open PowerShell
+
+Move to the following folder:
+> cd rancherISO
+
+Remove the current rancher machine, if it exists:
+> docker-machine rm rancher
+
+We're install a new docker machine using the virtualbox driver.  We'll use the rancher.iso ISO file for the bootup and installation.  And the name of the Engine will be called rancher
+> docker-machine create -d virtualbox --virtualbox-boot2docker-url rancheros.iso rancher
+
+Virtaulbox will ask for permissions for netwrok adapters and dhcp server settings, click Yes/OK to both security questions.
+
+You should see a number of messages in the command prompt, the final few lines should say:
+    Setting Docker configuration on the remote daemon...
+    Checking connection to Docker...
+    Docker is up and running!
+
+Test the new docker machine, with
+> docker-machine.exe env rancher
+
+    $Env:DOCKER_TLS_VERIFY = "1"
+    $Env:DOCKER_HOST = "tcp://___.___.___.___:2376"
+    $Env:DOCKER_CERT_PATH = "C:\Users\_____\.docker\machine\machines\rancher"
+    $Env:DOCKER_MACHINE_NAME = "rancher"
+    # Run this command to configure your shell:
+    # & "C:\Program Files\Docker\Docker\Resources\bin\docker-machine.exe" env rancher | Invoke-Expression
+
+> Note down the IP address and folder location of the installed docker machine
+
+    IP: _______________________________
+
+    CERTS folder: _______________________________________________
+
+Remote connect to the rancher VM using SSH, you should see the command prompt change to [docker@rancher ~]
+> docker-machine ssh rancher
+
+Rancher divides the docker containers into two isoalted machines: system and user.  First look at the system level processes using "system-docker ps"
+> sudo system-docker ps
+    CONTAINER ID        IMAGE                       COMMAND                  CREATED             STATUS              PORTS               NAMES
+    8d00cc88332b        rancher/os-docker:1.12.3    "/usr/bin/user-docker"   12 minutes ago      Up 12 minutes                           docker
+    486ba9b2df32        rancher/os-console:v0.7.1   "/usr/bin/ros entrypo"   12 minutes ago      Up 12 minutes                           console
+    4d1e6a051ccd        rancher/os-base:v0.7.1      "/usr/bin/ros entrypo"   12 minutes ago      Up 12 minutes                           network
+    9cbe35ecac2c        rancher/os-base:v0.7.1      "/usr/bin/ros entrypo"   12 minutes ago      Up 12 minutes                           ntp
+    d9080787fcef        rancher/os-udev:v0.7.1      "/usr/bin/ros entrypo"   12 minutes ago      Up 12 minutes                           udev
+    56568325034c        rancher/os-syslog:v0.7.1    "/usr/bin/ros entrypo"   12 minutes ago      Up 12 minutes                           syslog
+    b5f2073fdab8        rancher/os-acpid:v0.7.1     "/usr/bin/ros entrypo"   12 minutes ago      Up 12 minutes                           acpid
+
+Next, review the user containers in default, using "docker ps"
+> docker ps
+    CONTAINER ID        IMAGE                       COMMAND                  CREATED             STATUS              PORTS               NAMES
+
+Create a new container and image for nginx in daemon mode, using the "docker run -d" command,
+> docker run -d nginx
+
+Check the the user containers, using "docker ps"
+> docker ps
+CONTAINER ID        IMAGE               COMMAND                  CREATED              STATUS              PORTS               NAMES
+80d58f6bc2b2        nginx               "nginx -g 'daemon off"   About a minute ago   Up About a minute   80/tcp, 443/tcp     adoring_snyder
+
+Next, create a new container called busydash in the system engine.  BusyDash is a small Linux dashboard that you can run through the Web browser and check uptime and other informaiton.
+> sudo system-docker run -d --net=host --name busydash husseingalal/busydash
+
+BusyDash runs on port 80, so in a browser visit the rancher IP address, you noted from step 6.  The Web site should have a title "Linux Dash. A simple linux dashboard" and have menus for System Status, Basic info, Netwrok, Accounts, Apps.
+http://___.___.___.___
+
+This container will not restart if the VirtualBox is rebooted, so you can create a startup script:
+
+$ sudo mkdir -p /opt/rancher/bin
+$ echo “sudo system-docker start busydash” | sudo tee -a /opt/rancher/bin/start.sh
+$ sudo chmod 755 /opt/rancher/bin/start.sh
+
+
+Next, we'll install the Rancher server
+
+> docker run -d --restart=unless-stopped -p 8080:8080 rancher/server
+
+Check Rancher server is running:
+$ docker ps
+    CONTAINER ID        IMAGE               COMMAND                  CREATED              STATUS              PORTS                              NAMES
+    52dd129137da        rancher/server      "/usr/bin/entry /usr/"   About a minute ago   Up 58 seconds       3306/tcp, 0.0.0.0:8080->8080/tcp   stupefied_cray
+    80d58f6bc2b2        nginx               "nginx -g 'daemon off"   22 minutes ago       Up 22 minutes       80/tcp, 443/tcp                    adoring_snyder
+
+Wait a minute while the Rnacher server is loading.  then in the Web browser visit http://192.168.99.100:8080 , eventually you'll see a welcome screen for the server UI
+
+In the UI, setup authentication by going to ADMIN->ACCESS CONTROL.  There are a number of aithorization providers plugins.  For simplicity we'll use local username and password.
+
+Click local
+In Setup and Admin user, type login username as: admin
+for password type: pw
+confirm password: pw
+
+Now click Enable Local Auth, save password if prompted by the Web browser.
+
+Click Infrastrcutre->Hosts.  Ckick Add Host.  We'll first add the current Host to the managed hosts, by clicking Save.
+Click Add Host.  Click the "+ Add Label" and add akey/value pair of: type=vbox
+Copy the text from "step 5" whcih is the connection command for registering nodes with Rancher server, Ctrl-C to copy it to your clipboard.  It should look something like:
+    Text looks like: `sudo docker run -e CATTLE_HOST_LABELS='type=vbox'  -d --privileged -v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/rancher:/var/lib/rancher
+                     rancher/agent:v1.1.0 http://__,___,__.__:8080/v1/scripts/0C0D06DF94EB0CDF5F5B:1481562000000:8gCezIdj381guegzNEpn1kanw`
+
+Click the Close button at the bottom of the Web page, to go back to the Host screen.  Your nodes will appear in this screen, once they are connected to Rancher
+
+
+Now, we will create new Hosts, by creating new machines.  We'll create 3 new virtual machines, these will act as virtual servers in of cluster.
+    Note, this will take some time as the steps will look for a DHCP IP address.  In a production environment we would allocate these IP addresses on physical 'harebone' machines.
+    Note 2, if any node fails to obtain an IP address, then remove it: "docker-machine rm node___"
+
+Open a 2nd Powershell prompt
+> docker-machine create -d virtualbox --virtualbox-boot2docker-url rancheros.iso node1
+
+Switch the PowerShell to use node1
+> docker-machine.exe env node1
+> & "C:\Program Files\Docker\Docker\Resources\bin\docker-machine.exe" env node1 | Invoke-Expression
+
+Remote SSH into node1
+> docker-machine ssh node1
+
+Paste the connection command that is in your clipboard, similar to:
+   $ sudo docker run -e CATTLE_HOST_LABELS='type=vbox'  -d --privileged -v ... rancher/agent:v1.1.0 http://...:8080/...
+
+Now, check the containers running on node1:
+$ docker ps
+CONTAINER ID        IMAGE                            COMMAND                  CREATED              STATUS              PORTS               NAMES
+42d7324e8455        rancher/net:v0.7.5               "sh -c 'touch /var/lo"   50 seconds ago       Up 50 seconds                           r-ipsec-ipsec-cni-driver-1-09698bbd
+d531f7126b6a        rancher/plugin-manager:v0.2.12   "/usr/bin/start.sh pl"   About a minute ago   Up About a minute                       r-network-services-network-manager-1-47820d9f
+ce2f3877db3c        rancher/agent:v1.1.0             "/run.sh run"            About a minute ago   Up About a minute                       rancher-agent
+
+Logout of the current container "node1"
+> exit
+
+
+Repeat steps for node2
+> docker-machine create -d virtualbox --virtualbox-boot2docker-url rancheros.iso node2
+> docker-machine.exe env node2
+> & "C:\Program Files\Docker\Docker\Resources\bin\docker-machine.exe" env node2 | Invoke-Expression
+> docker-machine ssh node2
+$ Paste connection command (Ctrl-V) and press enter
+$ docker ps
+$ exit
+
+
+Repeat steps for node3
+> docker-machine create -d virtualbox --virtualbox-boot2docker-url rancheros.iso node3
+> docker-machine.exe env node3
+> & "C:\Program Files\Docker\Docker\Resources\bin\docker-machine.exe" env node3 | Invoke-Expression
+> docker-machine ssh node3
+$ Paste connection command (Ctrl-V) and press enter
+$ docker ps
+$ exit
+
+Finally, we need to add the "rancher" node to the UI hosts.
+Click the Add Hosts button and in "step 3" type in the IP address from the current URL http:___________:8080, we need just the IP, no http or port number.
+    The connection command in Step 4 is updated so we can connect the rancher agent to the server on the same host.
+
+Copy the connection command from step 4 (Ctrl-C)
+
+Move to the powershell prompt where we are connected to the main rancher server, ie. [docker@rancher ~]$ prompt
+Paste in the clipboard command (Ctrl-V) and press enter
+    This will download the rancher agent and connect the host to the rancher server UI.  A new box will appear in the Hosts page, with the title "Rancher"
+
+In the Hosts web page, click on the rancher node text (when you hover over it the test is blue).  When you click on an host, the web page drills-down into the server details and summarises the hardware, CPU, Memory network and storage.  As well as all the container, ports, labels and storage
+
+Now we have our Rancher Hosts setup!  Rancher gives administrators a visualization of their Docker cluster.  The cluster contains Hosts, and the hosts run Containers.  Rancher allows administrators to manager their cluster without remote ssh connecting to individual machines.
+Rancher can work with standalone Docker hosts, as we have done.  It can also manage and orchastrate Docker Swarm, Kubernetes and Mesos clusters.
+
+
+
+Part 2
+
+Add Private Registry
+
+In VirtualBox, open the Ubuntu client, we use a VM instead of a real server for training purposes.  In a production/developer environment we would have a standalone server with "registry" configured.
+
+$ cd ~/Downloads
+$ sudo ./install-compose.sh
+    Ingnore any warnings about older versions
+
+Allpw non-root users to run docker?
+$ sudo usermod -aG docker user
+
+Change directory to the Portus folder
+$ cd ~/Downloads/Portus
+
+Find your IP address of the ubuntu VM, It is after Id Addr in the "Ehternet" details
+$ ifconfig
+
+
+Start the build script to install and configure Portus
+$ ./compose-setup.sh -e  ___.___.___.___
+
+Are you sure to delete all the data? (Y), type Y and enter
+
+This will take 15-20 minutes to install, take a break!
+
+Once the portus server is running.
+In a new Terminal window
+$ gedit /etc/default/docker
+
+change the file so it has:
+
+    DOCKER_OPTS="--insecure-registry ___.___.___.___:5000"
+
+Save the file and exit gedit
+
+$ service docker restart
+
+$ docker login -u admin -p pw ___.___.___.___:5000
+
+$ docker images
+
+$ docker pull alpine
+$ docker tag alpine ___.___.___.___:5000/admin/alpine
+$docker push alpine ___.___.___.___:5000/admin/alpine
+
+
+
+https://developer.ibm.com/recipes/tutorials/setup-private-docker-registry-with-suse-portus-on-ubuntu/
