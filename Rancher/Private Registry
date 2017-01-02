@@ -13,6 +13,7 @@ $Env:DOCKER_MACHINE_NAME = "default"
 PS C:\Users\ruair> & "C:\Program Files\Docker\Docker\Resources\bin\docker-machine.exe" env default | Invoke-Expression
 PS C:\Users\ruair> docker-machine active
 default
+**************START HERE*********************************
 PS C:\Users\ruair> docker-machine create --driver virtualbox --engine-insecure-registry reg.local:5000 mycompany
 Running pre-create checks...
 Creating machine...

@@ -1,0 +1,334 @@
+Create 3 new machines in VirtualBox, these represent our physical nodes.
+
+> docker-machine create --driver virtualbox --virtualbox-boot2docker-url .\boot2docker.iso --engine-opt experimental swarm1
+> docker-machine create --driver virtualbox --virtualbox-boot2docker-url .\boot2docker.iso --engine-opt experimental swarm2
+> docker-machine create --driver virtualbox --virtualbox-boot2docker-url .\boot2docker.iso --engine-opt experimental swarm3
+
+If you get a certificate error, may need to run:
+> docker-machine regenerate-certs swarm1
+> docker-machine regenerate-certs swarm2
+> docker-machine regenerate-certs swarm3
+
+Info:
+  In Powershell, ned to switch between machines, with these commands:
+
+  & "C:\Program Files\Docker\Docker\Resources\bin\docker-machine.exe" env swarm1 | Invoke-Expression
+  & "C:\Program Files\Docker\Docker\Resources\bin\docker-machine.exe" env swarm2 | Invoke-Expression
+  & "C:\Program Files\Docker\Docker\Resources\bin\docker-machine.exe" env swarm3 | Invoke-Expression
+  This command will tell you your current machine:
+  > docker-machine env
+
+To find out the IP addres of swarm1 use the following command, note down the IP address:
+docker-machine ip swarm1
+
+Info:
+  We can login with ssh to each one, later logout of docker-machine with "exit":
+  > docker-machine ssh swarm1
+  > docker-machine ssh swarm2
+  > docker-machine ssh swarm3
+
+Login to first node with ssh:
+> docker-machine ssh swarm1
+
+Make this node the leader and adrvertise the IP address (we need to choose which network to advertise the swarm).  You IP address will be different, type "docker swarm init" to see which networks to choose from.
+$ docker swarm init --advertise-addr 192.168.99.102
+
+Copy the output from the swarm init command, it should look like:
+   docker swarm join \
+   --token SWMTKN-1-3fln02hxiigkt5lx3htmwetjiajl1c4jfqqghivb56w9w2f01q-d6k5atu2mm8l9uk3k22ox17kb \
+   192.168.99.102:2377
+
+Logout of swarm1:
+$ exit
+
+Login to swarm2:
+> docker-machine ssh swarm2
+
+Paste in the swarm join command with ctrl-v:
+
+ $ docker swarm join \
+   --token SWMTKN-1-3fln02hxiigkt5lx3htmwetjiajl1c4jfqqghivb56w9w2f01q-d6k5atu2mm8l9uk3k22ox17kb \
+   192.168.99.102:2377
+
+Info:
+  You should see a message similar to: "This node joined a swarm as a worker."
+
+Logout of swarm2:
+$ exit
+
+Repeat the same process for swarm3
+
+Login to swarm3:
+> docker-machine ssh swarm3
+
+Paste in the swarm join command with ctrl-v:
+
+ $ docker swarm join \
+   --token SWMTKN-1-3fln02hxiigkt5lx3htmwetjiajl1c4jfqqghivb56w9w2f01q-d6k5atu2mm8l9uk3k22ox17kb \
+   192.168.99.102:2377
+
+Info:
+  You should see a message similar to: "This node joined a swarm as a worker."
+
+Logout of swarm2:
+$ exit
+
+In Powersheell, list the nodes in the swarm, let's make sure we are connected to swarm1 as our default machine:
+  & "C:\Program Files\Docker\Docker\Resources\bin\docker-machine.exe" env swarm1 | Invoke-Expression
+
+  > docker node ls
+
+Let's get more information about each node:
+  > docker node inspect self
+  > docker node inspect swarm2
+  > docker node inspect swarm3
+
+  Self should be the Leader.
+
+Let's promote all 3 nodes to be managers, and to vote in the Raft elections of a Leader.  This will also make our swarm more fault tolerant.
+ > docker node promote swarm2
+
+  Info: you should see: "Node swarm2 promoted to a manager in the swarm."
+ > docker node promote swarm3
+
+  Info: you should see: "Node swarm3 promoted to a manager in the swarm."
+
+  Let's get more information about each node:
+  > docker node inspect self
+  > docker node inspect swarm2
+  > docker node inspect swarm3
+
+  Info: now all 3 nodes have a ManagerStatus of "reachable"
+
+  Review the information to see which are managers:
+  > docker info
+
+  Because we have limited hardware, we can't have too many nodes in our swarm, we'll demote 2 nodes to be normal worker nodes and have only one manager.
+
+  > docker node demote swarm3
+         Manager swarm3 demoted in the swarm.
+  > docker node demote swarm2
+        Manager swarm2 demoted in the swarm.
+
+Now, let's mark one node with a label.  These labels can be used later to constrain services, so they are deployed on certain nodes in the swarm.
+  > docker node update --label-add type=ssd swarm3
+  > docker node update --label-add com.cargobay.ssd=true swarm1
+
+
+
+Part 1
+
+Let's SSH into swarm1 and install Docker Registry:
+> docker-machine ssh swarm1
+$ docker run -d --restart=always -p 4000:5000 --name v2_mirror \
+  -v $PWD/rdata:/var/lib/registry \
+  -e REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io \
+  registry:2.5
+$ docker ps
+
+Run Swarm Visualizer container on the leader node:
+$ docker run -it -d --name swarm_visualizer \
+  -p 8000:8080 -e HOST=localhost \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  manomarks/visualizer:beta
+
+In a Browser open, which will show you the Swarm Visualization: http://192.168.99.102:8000/
+
+We'll start a simple service on the swarm:
+$ docker service create --name webapp -p 80:80 alpine ping disney.com
+
+Check which node the service is running on:
+$ docker service ps webapp
+
+Discover all the configuration information aout our service:
+$ docker service inspect webapp
+
+In a Browser open, which will show you the Swarm Visualization: http://192.168.99.102:8000/
+
+Check the logs output from the webapp:
+$ docker service logs webapp
+webapp.1.9dtqcup7szny@swarm1    | PING disney.com (199.181.131.249): 56 data bytes
+webapp.1.9dtqcup7szny@swarm1    | 64 bytes from 199.181.131.249: seq=0 ttl=238 time=187.335 ms
+webapp.1.9dtqcup7szny@swarm1    | 64 bytes from 199.181.131.249: seq=1 ttl=238 time=197.738 ms
+.....
+
+Let's remove the webapp service from our services in the swarm:
+$ docker service rm webapp
+$ docker service ps webapp
+Error: No such service: webapp
+
+In a Browser open, which will show you the Swarm Visualization: http://192.168.99.102:8000/
+
+Part 2
+
+Download a docker-compose file to swarm1 node:
+> docker-machine ssh swarm1
+$ curl https://gist.githubusercontent.com/RuairiSpain/962f42cc97fbfb2eb47f5e53eb22f092/raw/1f94c6b66852311c904684d55259e25982fb7527/docker-compose.yml > docker-compose.yml
+
+Now, we'll deploy our services using a docker-compose file:
+$ docker deploy --compose-file docker-compose.yml VOTE
+
+While this is deploying, look at the Visualizer in the Browser, you'll see the services being deployed on different nodes: http://192.168.99.102:8000/
+
+Info: This compose file has:
+      voting-app - a Python webapp which lets you vote between two options; requires redis
+      redis - Redis queue which collects new votes; deployed on swarm manager node
+      worker - .NET worker which consumes votes and stores them in db;
+      # of replicas: 2 replicas
+        hard limit: max 25% CPU and 512MB memory
+        soft limit: max 25% CPU and 256MB memory
+        placement: on swarm worker nodes only
+        restart policy: restart on-failure, with 5 seconds delay, up to 3 attempts
+        update policy: one by one, with 10 seconds delay and 0.3 failure rate to tolerate during the update
+      db - Postgres database backed by a Docker volume; deployed on swarm manager node
+      result-app - Node.js webapp which shows the results of the voting in real time; 2 replicas, deployed on swarm worker nodes
+
+Let's see the services (containers) running in the swarm, using the CLI:
+$ docker service ls
+ID            NAME             MODE        REPLICAS  IMAGE
+mrt85n0na945  VOTE_result-app  replicated  1/1       gaiadocker/example-voting-app-result:latest
+p12h2kerq4if  VOTE_db          replicated  1/1       postgres:9.4
+xgkmqefp6ld4  VOTE_redis       replicated  1/1       redis:3.2-alpine
+xx4l2an6wtha  VOTE_voting-app  replicated  2/2       gaiadocker/example-voting-app-vote:good
+yudguj74bht8  VOTE_worker      replicated  2/2       gaiadocker/example-voting-app-worker:latest
+
+  Info: notice the replicas, actual and desired number of replicas.
+
+Let's see on which nodes the VOTE_worker is running:
+$ docker service ps VOTE_worker
+ID            NAME           IMAGE                                        NODE    DESIRED STATE  CURRENT STATE          ERROR  PORTS
+s4315dxstsxx  VOTE_worker.1  gaiadocker/example-voting-app-worker:latest  swarm3  Running        Running 6 minutes ago
+q3klx7zb4ugs  VOTE_worker.2  gaiadocker/example-voting-app-worker:latest  swarm2  Running        Running 6 minutes ago
+
+In explorer, open the docker-compose.yml file and look at the services and how they were configured.  Specifically look for the port numbers for the voting-app and result-app.
+
+Let's test the apps, by hitting all 3 nodes in the swarm, because it uses an overlay network the swarm will route the HTTP requests over the mesh network:
+http://192.168.99.105:5000/
+http://192.168.99.106:5000/
+http://192.168.99.107:5000/
+
+In the 3 browser windows, Vote for 2 Dogs and 1 Cat.  So we have soem test input.
+
+Now let's see the results app web page, again we can use any IP address that is in the Swarm, the request will be routed over the overlay network:
+http://192.168.99.105:5001/
+
+Change your votes in the voting-app, and you'll see the result-app automatically updated.  The voting-app saves votes to the redis cache, which are then copied by the worker service to the postgres database.  Then the result-app distapys the changes.
+
+Next let's scale the voting-app to 10 replicas:
+$ docker service scale VOTE_voting-app=10
+
+Check the replicas with:
+docker service ls
+
+And see where they are running:
+$ docker service ps VOTE_voting-app
+ID            NAME                IMAGE                                    NODE    DESIRED STATE  CURRENT STATE          ERROR  PORTS
+xqca379100wd  VOTE_voting-app.1   gaiadocker/example-voting-app-vote:good  swarm3  Running        Running 2 hours ago
+micbaohjzrgh  VOTE_voting-app.2   gaiadocker/example-voting-app-vote:good  swarm2  Running        Running 2 hours ago
+q59c2f9fm9oo  VOTE_voting-app.3   gaiadocker/example-voting-app-vote:good  swarm2  Running        Running 2 minutes ago
+iv82thldeqei  VOTE_voting-app.4   gaiadocker/example-voting-app-vote:good  swarm3  Running        Running 2 minutes ago
+3n7incdpe8nw  VOTE_voting-app.5   gaiadocker/example-voting-app-vote:good  swarm2  Running        Running 2 minutes ago
+xjjdha0xzsvf  VOTE_voting-app.6   gaiadocker/example-voting-app-vote:good  swarm3  Running        Running 2 minutes ago
+qjsc61alaldi  VOTE_voting-app.7   gaiadocker/example-voting-app-vote:good  swarm2  Running        Running 2 minutes ago
+nku4klb1p2bo  VOTE_voting-app.8   gaiadocker/example-voting-app-vote:good  swarm3  Running        Running 2 minutes ago
+qdu08la02689  VOTE_voting-app.9   gaiadocker/example-voting-app-vote:good  swarm2  Running        Running 2 minutes ago
+a2yelship1ix  VOTE_voting-app.10  gaiadocker/example-voting-app-vote:good  swarm3  Running        Running 2 minutes ago
+
+Next let's drain a node, to simulate a hardware update
+$ docker node update --availability drain swarm2
+
+Now look at the Visualizer and see that swarm2 has no services.
+
+Next, make swarm2 active again.
+$ docker node update --availability active swarm2
+
+You'll see that the services have not been redistributed back to swarm2.  So we'll reduce the VOTE_voting-app replicas to 2 and then back to 10
+$ docker service scale VOTE_voting-app=2
+$ docker service scale VOTE_voting-app=10
+
+Look at the Visualizer and see that swarm2 has many services again.
+
+Bonus:
+
+Add Portainer Web GUI as a service, so we can manage the Swarm remotely.
+
+In Swarm1, use the following command:
+docker service create \
+    --name portainer \
+    --publish 9000:9000 \
+    --constraint 'node.role == manager' \
+    --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock \
+    portainer/portainer \
+    -H unix:///var/run/docker.sock
+
+In a Browser, visit: http://192.168.99.105:9000/ (or any IP in our swarm overlay network.  You'll be redirected to a admin password page, the first time you visit.
+
+In the password boxes use a easy to remember password, so we don't forget it!  In our case use "password" and again with "password" in the confirm input box.  Then click the Validate button.
+
+In the subsequent page, you'll need to login.  User is "admin" and password is "password".  Then click Login button.
+
+In Portainer, you should see 6 Containers, 7 images 3 volumes and 7 networks.
+
+In the dashboard click networks button.  You should see the "ingress" overlay network, which is the swarms public facing loadbalancing network.  You should also see the VOTE_default and VOTE_voteapp overlay networks.  There are other netwroks that are less interesting.
+
+Click on the VOTE_voteapp network, in the Network detail page you'll see which containers are connected to this network.  You'll also see their local IP addresses within the swarm.
+
+Next, in the Portainer left menu click the Containers menu item.  This will show you the running conateinrs and their exposed ports (on the right).  You should see that swarm_visualizer is exposed on port 8000, which maps to port 8000 internally.  If you click the link, you may need to change the IP address from 0.0.0.0 to a IP of the swarm (this is a minor bug in the UI code).
+
+Back in Portainer in the Containers details page, if you click on "VOTE_result-app" conatainer this will show you the Container details page for the results app.  Notice it is running "node server.js" in the CMD and it has Environment variables and labels.  Some labels were defined in the YAML compose file, other were added automatically by Docker Swarm.
+
+In the same page, you should see three buttons for: Stats, Logs and Console.  Click the Stats button.  This will show you a live summary of the CPU usage, RAM uasage, network traffic and running processes (with PIDs).
+
+In the Browaer, click the back button to go back to the "Container details" page for the VOTE_result-app service.  Next click the Logs button.  This shows the standardout and standard error logs: stdout and stderr.
+
+In the Browaer, click the back button to go back to the "Container details" page for the VOTE_result-app service.  Click the "Console" button, and then the "Connect" button.  You should see a TTY console termainal open in the Browser that is connected to the voting-app container, this is equivalent to using the attach command in the docker CLI.
+
+In the console window (inside the web page), type ls to see the files and folders in the current folder.  You should see:
+Dockerfile docker-compose-test.yml package.json server.js tests and views
+
+In the console, cd into the views folder and display the contents of index.html:
+cd views
+cat index.html
+
+Click "Disconnect" button to stop the terminal window.
+
+Next, let's investigate the Postgres database.  In the Container page, click the "VOTE_db" service and click Console button and then Connect button.  You should see a TTY termainal for the postgress container.
+
+In the bash shell terminal type, using psql client with username "postgres" and list all the database in the server:
+# psql -U postgres -l
+
+List all the datbases in "public" schema, you see just the votes:
+# psql -U postgres -c "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
+
+
+In the terminal, run an SQL command to find all the records in the votes table:
+# psql -U postgres -c 'select * from votes'
+
+Finally, let's clean up our services and remove the VOTE stack:
+$ docker stack rm VOTE
+    Removing service VOTE_result-app
+    Removing service VOTE_db
+    Removing service VOTE_redis
+    Removing service VOTE_voting-app
+    Removing service VOTE_worker
+    Removing network VOTE_default
+    Removing network VOTE_voteapp
+$ docker service ls
+    ID            NAME       MODE        REPLICAS  IMAGE
+    sur4dxyv2wzo  portainer  replicated  1/1       portainer/portainer:latest
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
