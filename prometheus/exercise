@@ -1,0 +1,58 @@
+cd into prometheus filder
+
+Make sure we are using the default Docker Machine:
+> & "C:\Program Files\Docker\Docker\Resources\bin\docker-machine.exe" env | Invoke-Expression
+
+Check which containers are running:
+> docker ps
+
+In a text editor, open and review the compose file:
+code ./docker-compose.yml
+
+Note the services it creates:
+  prometheus: is the server that save all the metrics
+  node-exporter:
+  cadvisor: is a google project that scrapes metrics off the hosts docker-machine
+  grafana: is the web UI to analysis the metrics
+
+Start prometheus containers, this will download and setup containers.  This will take a few minutes:
+> docker-compose up -d
+
+When it is finished, check the containers are running:
+
+In a Browser, visit:
+http://192.168.99.100:3000
+
+Login with username: admin and password: password.
+
+In the top Promehteus start menu, click Data Source.  Then "+ Add data source"
+
+Edit the "config" settins so it looks like:
+    Name Prom
+    Type Prometheus
+    Url http://192.168.99.100:9090
+    Accress direct
+
+Click "Save and Text" button.  You should see a green "Data source is working" message.
+
+In the top Promehteus start menu, click Dashboards and then Import button.
+
+Click Upload .json File button and select C:\3000\prometheus\dashboards\Grafana_Dashboard.json
+
+In the Prometheus options dropdown list, select Prom (the data source we setup previously.
+
+Click "Save and Text" button.
+
+You should now see a summary screen for your "Grafana_Dashboard.json" metrics.
+
+Click the Save icon on the toolbar, to save our dashboard.
+
+You'll see Memory Usage, CPU usage, FileSystem Usage. Aswell as timelines per Container Usage: CPU, Menory and Network.
+
+Import a second dashboard, in the top Promehteus start menu, click Dashboards and then Import button.
+
+Click Upload .json File button and select C:\3000\prometheus\dashboards\System_Monitoring.json
+
+In the Prometheus options dropdown list, select Prom (the data source we setup previously.
+
+Click "Save and Text" button.
